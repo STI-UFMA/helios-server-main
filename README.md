@@ -1,3 +1,7 @@
+Um fork do Helios Voting da IFSC realizado pela UFMA.
+Deixamos nossos agradecimentos a esta universidade por ter disponibilizado o código fonte aqui no GitHub.
+
+
 - [Sistema de votação Helios como serviço de TIC](#sistema-de-votação-helios-como-serviço-de-tic)
   - [Personalizações feitas pelo IFSC no Helios](#personalizações-feitas-pelo-ifsc-no-helios)
 - [Guia de instalação e configuração do Helios](#guia-de-instalação-e-configuração-do-helios)
