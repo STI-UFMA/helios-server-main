@@ -1,0 +1,91 @@
+version: '3'
+services: 
+    db:
+        image: pg96:latest
+        container_name: db
+        env_file:
+            - .env
+        environment:
+            - TZ=America/Fortaleza
+        ports:
+            - "5432:5432"
+        sysctls:
+            kernel.sem: 250 32000 32 400
+            kernel.shmmax: 135144181760
+            kernel.shmall: 32994185
+        volumes:
+            - helios-db:/var/lib/postgresql/data
+            - ./docker/db/init.sql:/docker-entrypoint-initdb.d/init.sql
+        networks:
+            - helios-network
+        restart: unless-stopped
+    pgadmin:
+        image: dpage/pgadmin4
+        container_name: pgadmin
+        environment:
+            PGADMIN_DEFAULT_EMAIL: "admin@dominio.com"
+            PGADMIN_DEFAULT_PASSWORD: "senha_acesso_pgadmin"
+        ports:
+           - "8080:80"
+        depends_on:
+           - db
+        networks:
+           - helios-network
+        restart: unless-stopped
+    helios:
+        container_name: helios
+        build:
+            dockerfile: ./docker/Dockerfile
+            context: ./
+        command: python manage.py runserver 0.0.0.0:8000
+        depends_on:
+            - db
+        env_file:
+            - .env
+        environment:
+            - TZ=America/Fortaleza
+            - USER_ID=1000
+            - GROUP_ID=1000
+        ports:
+            - "80:80"
+            - "443:443"
+        networks:
+            - helios-network
+        restart: "${DOCKER_RESTART_POLICY:-unless-stopped}"
+        stop_grace_period: "${DOCKER_STOP_GRACE_PERIOD:-3s}"
+        volumes:
+            - "/etc/timezone:/etc/timezone:ro"
+            - "/etc/localtime:/etc/localtime:ro"
+            - ./.:/var/www/helios-server
+            - ./cron/rotinas:/etc/cron.d/rotinas
+            - ./vhost/helios-ssl.conf:/etc/apache2/sites-available/helios-ssl.conf
+            - ./apache_tuning/mpm_event.conf:/etc/apache2/mods-available/mpm_event.conf
+            - apache-logs:/var/log/apache2
+            - vol-letsencrypt:/etc/letsencrypt
+            - celery-logs:/var/log/celery
+            - redis-logs:/var/log/redis
+            - supervisor-logs:/var/log/supervisor
+        restart: unless-stopped
+        hostname: hostname_servidor
+        dns: "IP_DNS"
+        domainname: dominio.com
+
+networks:
+    helios-network:
+        driver: bridge
+        ipam:
+         config:
+           - subnet: X.Y.0.0/16
+volumes:
+    helios-db:
+        driver: local
+    apache-logs:
+        driver: local
+    celery-logs:
+        driver: local
+    redis-logs:
+        driver: local
+    supervisor-logs:
+        driver: local
+    vol-letsencrypt:
+        driver: local

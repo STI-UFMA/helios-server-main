@@ -1,0 +1,78 @@
+FROM ubuntu:bionic
+
+ENV OS_LOCALE="pt_BR.UTF-8"
+RUN apt-get update && apt-get install -y locales && locale-gen ${OS_LOCALE}
+ENV LANG=${OS_LOCALE} \
+    LANGUAGE=${OS_LOCALE} \
+    LC_ALL=${OS_LOCALE} \
+    DEBIAN_FRONTEND=noninteractive
+
+RUN     \
+        BUILD_DEPS='software-properties-common' \
+        && dpkg-reconfigure locales \
+        && apt-get install --no-install-recommends -y $BUILD_DEPS \
+        && add-apt-repository -y ppa:certbot/certbot \
+        && add-apt-repository -y ppa:ondrej/apache2
+RUN \
+ 	apt-get update && \
+ 	apt-get -y dist-upgrade && \
+  	apt-get install -y -q \
+    python-minimal \
+    python-pip \
+    python-virtualenv \
+    python-ldap \
+    python-dev \
+    libsasl2-dev \
+    libpq-dev \
+    libldap2-dev \
+    apache2 \
+    libapache2-mod-wsgi \
+    build-essential \
+    gettext \
+    supervisor \
+    redis-server \
+    certbot \
+    wget \
+    cron \
+    logrotate \
+    python-certbot-apache \
+    vim less &&\
+    rm -rf /var/lib/apt/lists/* && \
+ 	apt-get clean \
+    # making logging pipe
+    && mkfifo --mode 0666 /var/log/cron.log
+    
+# Remove sym links from apache image
+RUN rm /var/log/apache2/access.log
+RUN rm /var/log/apache2/error.log
+
+RUN sed -i "s/bind .*/bind 127.0.0.1/g" /etc/redis/redis.conf
+RUN sed -i "s/supervised no/supervised systemd/" /etc/redis/redis.conf
+RUN sed -i "s/daemonize yes/daemonize no/" /etc/redis/redis.conf
+
+COPY ./docker/supervisor/apache2-supervisor.conf /etc/supervisor/conf.d/apache2.conf
+COPY ./docker/supervisor/celery-supervisor.conf /etc/supervisor/conf.d/celery-helios.conf
+COPY ./docker/supervisor/redis-supervisor.conf /etc/supervisor/conf.d/redis-helios.conf
+
+COPY ./docker/docker-entrypoint.sh /docker-entrypoint.sh
+RUN chmod +x /docker-entrypoint.sh
+
+COPY ./docker/apache/helios-ssl.conf /etc/apache2/sites-available
+COPY ./docker/apache/apache-selfsigned.key /etc/ssl/private/dev-helios-apache.key
+COPY ./docker/apache/apache-selfsigned.crt /etc/ssl/certs/dev-helios-apache.crt
+
+RUN a2enmod rewrite && \
+    a2enmod ssl && \
+    a2dissite 000-default.conf && \
+    a2dissite default-ssl.conf && \
+    a2ensite helios-ssl.conf
+
+RUN groupadd -r -g 1000 helios && useradd -r -g helios -u 1000 helios
+
+WORKDIR /var/www/helios-server
+RUN chown helios:helios /var/www/helios-server
+
+EXPOSE 80
+EXPOSE 443
+
+ENTRYPOINT ["/docker-entrypoint.sh"]

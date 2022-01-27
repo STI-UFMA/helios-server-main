@@ -1,0 +1,2 @@
+00 23 * * * /usr/sbin/logrotate -f /etc/logrotate.d/apache2 &>/dev/null
+@monthly certbot renew --apache >> /var/log/cron.log 2>&1
